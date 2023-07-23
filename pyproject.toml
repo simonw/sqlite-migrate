@@ -1,0 +1,13 @@
+[project]
+name = "sqlite-migrate"
+version = "0.1a0"
+description = "A simple database migration system for SQLite, based on sqlite-utils"
+dependencies = [
+    "sqlite-utils"
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.entry-points.sqlite_utils]
+migrate = "sqlite_migrate.sqlite_utils_plugin"
