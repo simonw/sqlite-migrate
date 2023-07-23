@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 import datetime
-from typing import Callable, Optional
+from typing import cast, Callable, List, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlite_utils.db import Database, Table
 
 
 class Migrations:
@@ -16,7 +20,7 @@ class Migrations:
         :param name: The name of the migration set. This should be unique.
         """
         self.name = name
-        self._migrations = []
+        self._migrations: List[Migrations._Migration] = []
 
     def __call__(self, *, name: Optional[str] = None) -> Callable:
         """
@@ -30,7 +34,7 @@ class Migrations:
 
         return inner
 
-    def pending(self, db: "sqlite_utils.Database"):
+    def pending(self, db: "Database"):
         """
         Return a list of pending migrations.
         """
@@ -42,14 +46,14 @@ class Migrations:
             if migration.name not in already_applied
         ]
 
-    def apply(self, db: "sqlite_utils.Database"):
+    def apply(self, db: "Database"):
         """
         Apply any pending migrations to the database.
         """
         self.ensure_migrations_table(db)
         for migration in self.pending(db):
             migration.fn(db)
-            db[self.migrations_table].insert(
+            _table(db, self.migrations_table).insert(
                 {
                     "migration_set": self.name,
                     "name": migration.name,
@@ -57,12 +61,13 @@ class Migrations:
                 }
             )
 
-    def ensure_migrations_table(self, db: "sqlite_utils.Database"):
+    def ensure_migrations_table(self, db: "Database"):
         """
         Create _sqlite_migrations table if it doesn't already exist
         """
-        if not db[self.migrations_table].exists():
-            db[self.migrations_table].create(
+        table = _table(db, self.migrations_table)
+        if not table.exists():
+            table.create(
                 {
                     "migration_set": str,
                     "name": str,
@@ -75,3 +80,8 @@ class Migrations:
         return "<Migrations '{}': [{}]>".format(
             self.name, ", ".join(m.name for m in self._migrations)
         )
+
+
+def _table(db: "Database", name: str) -> "Table":
+    # mypy workaround
+    return cast("Table", db[name])

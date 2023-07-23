@@ -19,7 +19,7 @@ Changelog = "https://github.com/simonw/sqlite-migrate/releases"
 Issues = "https://github.com/simonw/sqlite-migrate/issues"
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "mypy", "black", "ruff"]
 
 [project.entry-points.sqlite_utils]
 migrate = "sqlite_migrate.sqlite_utils_plugin"
