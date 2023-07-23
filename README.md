@@ -5,13 +5,13 @@
 [![Tests](https://github.com/simonw/sqlite-migrate/workflows/Test/badge.svg)](https://github.com/simonw/sqlite-migrate/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/sqlite-migrate/blob/main/LICENSE)
 
-A simple database migration system for SQLite, based on sqlite-utils
+A simple database migration system for SQLite, based on [sqlite-utils](https://sqlite-utils.datasette.io/).
 
 **This project is an early alpha. Expect breaking changes.**
 
 ## Installation
 
-This tool works as a plugin for [sqlite-utils](https://sqlite-utils.datasette.io/). First install that:
+This tool works as a plugin for `sqlite-utils`. First [install that](https://sqlite-utils.datasette.io/en/stable/installation.html):
 
 ```bash
 pip install sqlite-utils
