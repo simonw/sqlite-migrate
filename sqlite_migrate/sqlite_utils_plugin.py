@@ -57,6 +57,11 @@ def register_commands(cli):
         if not migration_sets:
             raise click.ClickException("No migrations.py files found")
         db = sqlite_utils.Database(db_path)
+
+        if list_:
+            display_list(db, migration_sets)
+            return
+
         prev_schema = db.schema
         if verbose:
             click.echo("Migrating {}".format(db_path))
@@ -64,17 +69,7 @@ def register_commands(cli):
             click.echo(textwrap.indent(prev_schema, "  ") or "  (empty)")
             click.echo()
         for migration_set in migration_sets:
-            if list_:
-                click.echo(
-                    "Pending migrations for {}:\n{}".format(
-                        db_path,
-                        "\n".join(
-                            "- {}".format(m.name) for m in migration_set.pending(db)
-                        ),
-                    )
-                )
-            else:
-                migration_set.apply(db)
+            migration_set.apply(db)
         if verbose:
             click.echo("Schema after:\n")
             post_schema = db.schema
@@ -93,3 +88,24 @@ def register_commands(cli):
                 # sense if we provided filenames, and the next one
                 # because it is just @@ -0,0 +1,15 @@
                 click.echo("\n".join(diff[3:]))
+
+
+def display_list(db, migration_sets):
+    applied = set()
+    for migration_set in migration_sets:
+        print("Migrations for: {}".format(migration_set.name))
+        print()
+        print("  Applied:")
+        for migration in migration_set.applied(db):
+            print("    {} - {}".format(migration.name, migration.applied_at))
+            applied.add(migration.name)
+        print()
+        print("  Pending:")
+        output = False
+        for migration in migration_set.pending(db):
+            output = True
+            if migration.name not in applied:
+                print("    {}".format(migration.name))
+        if not output:
+            print("    (none)")
+        print()

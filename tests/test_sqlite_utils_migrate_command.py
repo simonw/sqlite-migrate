@@ -26,11 +26,34 @@ def bar(db):
         "utf-8",
     )
     db_path = str(path / "test.db")
+
     runner = CliRunner()
+
+    def _list():
+        list_result = runner.invoke(
+            sqlite_utils.cli.cli,
+            ["migrate", db_path, "--list", arg.replace("TMPDIR", str(path))],
+        )
+        assert list_result.exit_code == 0
+        return list_result.output
+
+    assert _list() == (
+        "Migrations for: hello\n\n"
+        "  Applied:\n\n"
+        "  Pending:\n"
+        "    foo\n"
+        "    bar\n\n"
+    )
+
     result = runner.invoke(
         sqlite_utils.cli.cli, ["migrate", db_path, arg.replace("TMPDIR", str(path))]
     )
     assert result.exit_code == 0, result.output
+
+    list_output = _list()
+    assert "Migrations for: hello\n\n  Applied:\n    foo - " in list_output
+    assert " Pending:\n    (none)" in list_output
+
     db = sqlite_utils.Database(db_path)
     assert db["foo"].exists()
     assert db["bar"].exists()

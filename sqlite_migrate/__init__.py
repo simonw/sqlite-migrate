@@ -15,6 +15,11 @@ class Migrations:
         name: str
         fn: Callable
 
+    @dataclass
+    class _AppliedMigration:
+        name: str
+        applied_at: datetime.datetime
+
     def __init__(self, name: str):
         """
         :param name: The name of the migration set. This should be unique.
@@ -34,7 +39,7 @@ class Migrations:
 
         return inner
 
-    def pending(self, db: "Database"):
+    def pending(self, db: "Database") -> List["Migrations._Migration"]:
         """
         Return a list of pending migrations.
         """
@@ -44,6 +49,18 @@ class Migrations:
             migration
             for migration in self._migrations
             if migration.name not in already_applied
+        ]
+
+    def applied(self, db: "Database") -> List["Migrations._AppliedMigration"]:
+        """
+        Return a list of applied migrations.
+        """
+        self.ensure_migrations_table(db)
+        return [
+            self._AppliedMigration(name=row["name"], applied_at=row["applied_at"])
+            for row in db[self.migrations_table].rows_where(
+                "migration_set = ?", [self.name]
+            )
         ]
 
     def apply(self, db: "Database"):
