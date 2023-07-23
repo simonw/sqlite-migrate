@@ -1,36 +1,50 @@
 import click
+import difflib
 import pathlib
 import sqlite_utils
 from sqlite_migrate import Migrations
+import textwrap
 
 
 @sqlite_utils.hookimpl
 def register_commands(cli):
     @cli.command()
-    @click.argument("path", type=click.Path(dir_okay=False))
+    @click.argument(
+        "db_path", type=click.Path(dir_okay=False, readable=True, writable=True)
+    )
+    @click.argument("migrations", type=click.Path(dir_okay=True, exists=True), nargs=-1)
     @click.option(
         "list_", "--list", is_flag=True, help="List migrations without running them"
     )
-    def migrate(path, list_):
+    @click.option("-v", "--verbose", is_flag=True, help="Show verbose output")
+    def migrate(db_path, migrations, list_, verbose):
         """
         Apply pending database migrations.
 
         Usage:
 
-            sqlite-utils migrate path/to/database.db
+            sqlite-utils migrate database.db
 
         This will find the migrations.py file in the current directory
         or subdirectories and apply any pending migrations.
 
-        Pass --list to see which migrations would be applied without
-        actually applying them.
+        Or pass paths to one or more migrations.py files directly:
 
-        Pass -m path/to/migrations.py to use a specific migrations file:
+            sqlite-utils migrate database.db path/to/migrations.py
 
-            sqlite-utils migrate database.db -m path/to/migrations.py
+        Pass --list to see a list of applied and pending migrations
+        without applying them.
         """
-        # Find the migrations.py file
-        files = pathlib.Path(".").rglob("migrations.py")
+        if not migrations:
+            # Scan current directory for migrations.py files
+            migrations = [pathlib.Path(".").resolve()]
+        files = set()
+        for path_str in migrations:
+            path = pathlib.Path(path_str)
+            if path.is_dir():
+                files.update(path.rglob("migrations.py"))
+            else:
+                files.add(path)
         migration_sets = []
         for filepath in files:
             code = filepath.read_text()
@@ -41,15 +55,19 @@ def register_commands(cli):
                 if isinstance(obj, Migrations):
                     migration_sets.append(obj)
         if not migration_sets:
-            raise click.ClickException(
-                "No migrations.py file found in current or subdirectories"
-            )
-        db = sqlite_utils.Database(path)
+            raise click.ClickException("No migrations.py files found")
+        db = sqlite_utils.Database(db_path)
+        prev_schema = db.schema
+        if verbose:
+            click.echo("Migrating {}".format(db_path))
+            click.echo("\nSchema before:\n")
+            click.echo(textwrap.indent(prev_schema, "  ") or "  (empty)")
+            click.echo()
         for migration_set in migration_sets:
             if list_:
                 click.echo(
                     "Pending migrations for {}:\n{}".format(
-                        path,
+                        db_path,
                         "\n".join(
                             "- {}".format(m.name) for m in migration_set.pending(db)
                         ),
@@ -57,3 +75,21 @@ def register_commands(cli):
                 )
             else:
                 migration_set.apply(db)
+        if verbose:
+            click.echo("Schema after:\n")
+            post_schema = db.schema
+            if post_schema == prev_schema:
+                click.echo("  (unchanged)")
+            else:
+                click.echo(textwrap.indent(post_schema, "  "))
+                click.echo("\nSchema diff:\n")
+                # Calculate and display a diff
+                diff = list(
+                    difflib.unified_diff(
+                        prev_schema.splitlines(), post_schema.splitlines()
+                    )
+                )
+                # Skipping the first two lines since they only make
+                # sense if we provided filenames, and the next one
+                # because it is just @@ -0,0 +1,15 @@
+                click.echo("\n".join(diff[3:]))

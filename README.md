@@ -20,7 +20,7 @@ Then install this plugin like so:
 ```bash
 sqlite-utils install sqlite-migrate
 ```
-## Usage
+## Migration files
 
 This tool works against migration files. A migration file looks like this:
 
@@ -46,10 +46,80 @@ def m002_add_weight(db):
     # db is a sqlite-utils Database instance
     db["creatures"].add_column("weight", float)
 ```
-Running this command will execute those migrations in sequence against the specified database file:
-```bash
-sqlite-utils migrate creatures.db
-```
-Running it multiple times will have no additional affect, unless you add more migration functions to the file.
-
 Here is [documentation on the Database instance](https://sqlite-utils.datasette.io/en/stable/python-api.html) passed to each migration function.
+
+## Running migrations
+
+Running this command will execute those migrations in sequence against the specified database file.
+
+Call `migrate` with a path to your database and a path to the migrations file you want to apply:
+```bash
+sqlite-utils migrate creatures.db path/to/migrations.py
+```
+Running this multiple times will have no additional affect, unless you add more migration functions to the file.
+
+If you call it without arguments it will search for and apply any `migrations.py` files in the current directory or any of its subdirectories.
+
+You can also pass the path to a directory, in which case all `migrations.py` files in that directory and its subdirectories will be applied:
+
+```bash
+sqlite-utils migrate creatures.db path/to/parent/
+```
+
+## Verbose mode
+
+Add `-v` or `--verbose` for verbose output, which will show the schema before and after the migrations were applied along with a diff:
+
+```bash
+sqlite-utils migrate creatures.db --verbose
+```
+Example output:
+```
+Migrating creatures.db
+
+Schema before:
+
+  CREATE TABLE [_sqlite_migrations] (
+     [migration_set] TEXT,
+     [name] TEXT PRIMARY KEY,
+     [applied_at] TEXT
+  );
+  CREATE TABLE [creatures] (
+     [id] INTEGER PRIMARY KEY,
+     [name] TEXT,
+     [species] TEXT
+  , [weight] FLOAT);
+
+Schema after:
+
+  CREATE TABLE [_sqlite_migrations] (
+     [migration_set] TEXT,
+     [name] TEXT PRIMARY KEY,
+     [applied_at] TEXT
+  );
+  CREATE TABLE "creatures" (
+     [id] INTEGER PRIMARY KEY,
+     [name] TEXT,
+     [species] TEXT,
+     [weight] FLOAT,
+     [age] INTEGER,
+     [shoe_size] INTEGER
+  );
+
+Schema diff:
+
+    [name] TEXT PRIMARY KEY,
+    [applied_at] TEXT
+ );
+-CREATE TABLE [creatures] (
++CREATE TABLE "creatures" (
+    [id] INTEGER PRIMARY KEY,
+    [name] TEXT,
+-   [species] TEXT
+-, [weight] FLOAT);
++   [species] TEXT,
++   [weight] FLOAT,
++   [age] INTEGER,
++   [shoe_size] INTEGER
++);
+```
