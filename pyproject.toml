@@ -1,6 +1,6 @@
 [project]
 name = "sqlite-migrate"
-version = "0.1a1"
+version = "0.1a2"
 description = "A simple database migration system for SQLite, based on sqlite-utils"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
