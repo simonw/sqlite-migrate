@@ -65,6 +65,11 @@ You can also pass the path to a directory, in which case all `migrations.py` fil
 ```bash
 sqlite-utils migrate creatures.db path/to/parent/
 ```
+When applying a single migrations file you can use the `--stop-before` option to apply all migrations up to but excluding the specified migration:
+
+```bash
+sqlite-utils migrate creatures.db path/to/migrations.py --stop-before m002_add_weight
+```
 
 ## Listing migrations
 

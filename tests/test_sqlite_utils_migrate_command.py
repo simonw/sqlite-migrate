@@ -3,14 +3,7 @@ import pathlib
 from click.testing import CliRunner
 import pytest
 
-
-@pytest.mark.parametrize("arg", ("TMPDIR", "TMPDIR/foo/migrations.py", "TMPDIR/foo/"))
-def test_basic(tmpdir, arg):
-    path = pathlib.Path(tmpdir)
-    (path / "foo").mkdir()
-    migrations_py = path / "foo" / "migrations.py"
-    migrations_py.write_text(
-        """
+TWO_MIGRATIONS = """
 from sqlite_migrate import Migrations
 
 m = Migrations("hello")
@@ -22,9 +15,21 @@ def foo(db):
 @m()
 def bar(db):
     db["bar"].insert({"hello": "world"})
-    """,
-        "utf-8",
-    )
+"""
+
+
+@pytest.fixture
+def two_migrations(tmpdir):
+    path = pathlib.Path(tmpdir)
+    (path / "foo").mkdir()
+    migrations_py = path / "foo" / "migrations.py"
+    migrations_py.write_text(TWO_MIGRATIONS, "utf-8")
+    return path, migrations_py
+
+
+@pytest.mark.parametrize("arg", ("TMPDIR", "TMPDIR/foo/migrations.py", "TMPDIR/foo/"))
+def test_basic(two_migrations, arg):
+    path, _ = two_migrations
     db_path = str(path / "test.db")
 
     runner = CliRunner()
@@ -141,3 +146,57 @@ Schema diff:
  );
 """.strip()
     assert expected_diff in result.output
+
+
+def test_stop_before(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    runner = CliRunner()
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        [
+            "migrate",
+            db_path,
+            str(path / "foo" / "migrations.py"),
+            "--stop-before",
+            "bar",
+        ],
+    )
+    assert result.exit_code == 0
+    db = sqlite_utils.Database(db_path)
+    assert db["foo"].exists()
+    assert not db["bar"].exists()
+
+
+def test_stop_before_error(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    (path / "foo" / "migrations2.py").write_text(
+        """
+from sqlite_migrate import Migrations
+
+m = Migrations("hello2")
+
+@m()
+def foo(db):
+    db["foo"].insert({"hello": "world"})
+    """,
+        "utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        [
+            "migrate",
+            db_path,
+            str(path / "foo" / "migrations.py"),
+            str(path / "foo" / "migrations2.py"),
+            "--stop-before",
+            "foo",
+        ],
+    )
+    assert result.exit_code == 1
+    assert (
+        "--stop-before can only be used with a single migrations.py file"
+        in result.output
+    )

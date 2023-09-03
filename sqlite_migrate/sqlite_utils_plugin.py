@@ -13,11 +13,12 @@ def register_commands(cli):
         "db_path", type=click.Path(dir_okay=False, readable=True, writable=True)
     )
     @click.argument("migrations", type=click.Path(dir_okay=True, exists=True), nargs=-1)
+    @click.option("--stop-before", help="Stop before applying this migration")
     @click.option(
         "list_", "--list", is_flag=True, help="List migrations without running them"
     )
     @click.option("-v", "--verbose", is_flag=True, help="Show verbose output")
-    def migrate(db_path, migrations, list_, verbose):
+    def migrate(db_path, migrations, stop_before, list_, verbose):
         """
         Apply pending database migrations.
 
@@ -56,6 +57,12 @@ def register_commands(cli):
                     migration_sets.append(obj)
         if not migration_sets:
             raise click.ClickException("No migrations.py files found")
+
+        if stop_before and len(migration_sets) > 1:
+            raise click.ClickException(
+                "--stop-before can only be used with a single migrations.py file"
+            )
+
         db = sqlite_utils.Database(db_path)
 
         if list_:
@@ -69,7 +76,7 @@ def register_commands(cli):
             click.echo(textwrap.indent(prev_schema, "  ") or "  (empty)")
             click.echo()
         for migration_set in migration_sets:
-            migration_set.apply(db)
+            migration_set.apply(db, stop_before=stop_before)
         if verbose:
             click.echo("Schema after:\n")
             post_schema = db.schema

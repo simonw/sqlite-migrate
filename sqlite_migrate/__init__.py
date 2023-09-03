@@ -63,17 +63,20 @@ class Migrations:
             )
         ]
 
-    def apply(self, db: "Database"):
+    def apply(self, db: "Database", *, stop_before: Optional[str] = None):
         """
         Apply any pending migrations to the database.
         """
         self.ensure_migrations_table(db)
         for migration in self.pending(db):
+            name = migration.name
+            if name == stop_before:
+                return
             migration.fn(db)
             _table(db, self.migrations_table).insert(
                 {
                     "migration_set": self.name,
-                    "name": migration.name,
+                    "name": name,
                     "applied_at": str(datetime.datetime.utcnow()),
                 }
             )
