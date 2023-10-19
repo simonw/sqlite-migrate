@@ -77,7 +77,7 @@ class Migrations:
                 {
                     "migration_set": self.name,
                     "name": name,
-                    "applied_at": str(datetime.datetime.utcnow()),
+                    "applied_at": str(datetime.datetime.now(datetime.UTC)),
                 }
             )
 
