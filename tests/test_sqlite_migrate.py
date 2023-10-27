@@ -18,6 +18,17 @@ def migrations():
     return migrations
 
 
+@pytest.fixture
+def migrations2():
+    migrations = Migrations("test2")
+
+    @migrations()
+    def m001(db):
+        db["dogs2"].insert({"name": "Cleo"})
+
+    return migrations
+
+
 def test_basic(migrations):
     db = sqlite_utils.Database(memory=True)
     assert db.table_names() == []
@@ -33,3 +44,11 @@ def test_stop_before(migrations):
     # Apply the rest
     migrations.apply(db)
     assert set(db.table_names()) == {"_sqlite_migrations", "dogs", "cats"}
+
+
+def test_two_migration_sets(migrations, migrations2):
+    db = sqlite_utils.Database(memory=True)
+    assert db.table_names() == []
+    migrations.apply(db)
+    migrations2.apply(db)
+    assert set(db.table_names()) == {"_sqlite_migrations", "dogs", "cats", "dogs2"}

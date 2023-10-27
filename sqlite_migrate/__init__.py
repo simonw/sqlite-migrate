@@ -44,7 +44,12 @@ class Migrations:
         Return a list of pending migrations.
         """
         self.ensure_migrations_table(db)
-        already_applied = {r["name"] for r in db[self.migrations_table].rows}
+        already_applied = {
+            r["name"]
+            for r in db[self.migrations_table].rows_where(
+                "migration_set = ?", [self.name]
+            )
+        }
         return [
             migration
             for migration in self._migrations
@@ -93,7 +98,7 @@ class Migrations:
                     "name": str,
                     "applied_at": str,
                 },
-                pk="name",
+                pk=("migration_set", "name"),
             )
 
     def __repr__(self):

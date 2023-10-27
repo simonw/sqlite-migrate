@@ -56,7 +56,10 @@ def test_basic(two_migrations, arg):
     assert result.exit_code == 0, result.output
 
     list_output = _list()
-    assert "Migrations for: hello\n\n  Applied:\n    foo - " in list_output
+    assert "Migrations for: hello\n\n  Applied:\n    " in list_output
+    prior_to_pending = list_output.split(" Pending")[0]
+    assert "  foo" in prior_to_pending
+    assert "  bar" in prior_to_pending
     assert " Pending:\n    (none)" in list_output
 
     db = sqlite_utils.Database(db_path)
@@ -101,8 +104,9 @@ Schema before:
 
   CREATE TABLE [_sqlite_migrations] (
      [migration_set] TEXT,
-     [name] TEXT PRIMARY KEY,
-     [applied_at] TEXT
+     [name] TEXT,
+     [applied_at] TEXT,
+     PRIMARY KEY ([migration_set], [name])
   );
   CREATE TABLE [dogs] (
      [id] INTEGER,
@@ -133,8 +137,8 @@ def bar(db):
     expected_diff = """
 Schema diff:
 
-    [name] TEXT PRIMARY KEY,
-    [applied_at] TEXT
+    [applied_at] TEXT,
+    PRIMARY KEY ([migration_set], [name])
  );
 -CREATE TABLE [dogs] (
 +CREATE TABLE "dogs" (
