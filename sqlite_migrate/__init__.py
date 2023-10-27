@@ -88,7 +88,7 @@ class Migrations:
 
     def ensure_migrations_table(self, db: "Database"):
         """
-        Create _sqlite_migrations table if it doesn't already exist
+        Ensure _sqlite_migrations table exists and has the correct schema
         """
         table = _table(db, self.migrations_table)
         if not table.exists():
@@ -100,6 +100,9 @@ class Migrations:
                 },
                 pk=("migration_set", "name"),
             )
+        elif table.pks != ["migration_set", "name"]:
+            # This has the old primary key scheme, upgrade it
+            table.transform(pk=("migration_set", "name"))
 
     def __repr__(self):
         return "<Migrations '{}': [{}]>".format(

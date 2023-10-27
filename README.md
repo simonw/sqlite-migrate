@@ -109,10 +109,11 @@ Migrating creatures.db
 
 Schema before:
 
-  CREATE TABLE [_sqlite_migrations] (
+  CREATE TABLE "_sqlite_migrations" (
      [migration_set] TEXT,
-     [name] TEXT PRIMARY KEY,
-     [applied_at] TEXT
+     [name] TEXT,
+     [applied_at] TEXT,
+     PRIMARY KEY ([migration_set], [name])
   );
   CREATE TABLE [creatures] (
      [id] INTEGER PRIMARY KEY,
@@ -122,10 +123,11 @@ Schema before:
 
 Schema after:
 
-  CREATE TABLE [_sqlite_migrations] (
+  CREATE TABLE "_sqlite_migrations" (
      [migration_set] TEXT,
-     [name] TEXT PRIMARY KEY,
-     [applied_at] TEXT
+     [name] TEXT,
+     [applied_at] TEXT,
+     PRIMARY KEY ([migration_set], [name])
   );
   CREATE TABLE "creatures" (
      [id] INTEGER PRIMARY KEY,
@@ -138,9 +140,9 @@ Schema after:
 
 Schema diff:
 
-    [name] TEXT PRIMARY KEY,
-    [applied_at] TEXT
- );
+    [applied_at] TEXT,
+    PRIMARY KEY ([migration_set], [name])
+  );
 -CREATE TABLE [creatures] (
 +CREATE TABLE "creatures" (
     [id] INTEGER PRIMARY KEY,
