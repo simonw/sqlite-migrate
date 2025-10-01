@@ -23,3 +23,7 @@ test = ["pytest", "mypy", "black", "ruff", "cogapp"]
 
 [project.entry-points.sqlite_utils]
 migrate = "sqlite_migrate.sqlite_utils_plugin"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
