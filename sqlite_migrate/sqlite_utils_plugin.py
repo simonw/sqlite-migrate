@@ -147,9 +147,11 @@ def display_dry_run(db, migration_sets, stop_before=None):
         click.echo("No pending migrations")
         return
 
-    click.echo("Would apply {} migration{}:".format(
-        len(all_applied), "s" if len(all_applied) != 1 else ""
-    ))
+    click.echo(
+        "Would apply {} migration{}:".format(
+            len(all_applied), "s" if len(all_applied) != 1 else ""
+        )
+    )
     for name in all_applied:
         click.echo("  - {}".format(name))
     click.echo()

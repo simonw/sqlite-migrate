@@ -254,4 +254,7 @@ def test_dry_run_no_pending(two_migrations):
         ["migrate", db_path, str(path / "foo" / "migrations.py"), "--dry-run"],
     )
     assert result.exit_code == 0
-    assert "No pending migrations" in result.output or "no pending" in result.output.lower()
+    assert (
+        "No pending migrations" in result.output
+        or "no pending" in result.output.lower()
+    )
