@@ -190,3 +190,42 @@ Schema diff:
  );
 ```
 <!-- [[[end]]] -->
+
+## Using as a Python library
+
+You can also use `sqlite-migrate` directly as a Python library, without the CLI:
+
+```python
+from sqlite_migrate import Migrations
+import sqlite_utils
+
+# Create a migration set with a unique name
+migration = Migrations("myapp")
+
+@migration()
+def create_users(db):
+    db["users"].create({"id": int, "name": str, "email": str}, pk="id")
+
+@migration()
+def add_created_at(db):
+    db["users"].add_column("created_at", str)
+
+# Connect to a database
+db = sqlite_utils.Database("myapp.db")
+
+# Apply all pending migrations
+migration.apply(db)
+
+# Check which migrations have been applied
+for m in migration.applied(db):
+    print(f"Applied: {m.name} at {m.applied_at}")
+
+# Check which migrations are still pending
+for m in migration.pending(db):
+    print(f"Pending: {m.name}")
+
+# Apply migrations up to (but not including) a specific one
+migration.apply(db, stop_before="add_created_at")
+```
+
+The `db` object passed to each migration function is a [sqlite-utils Database instance](https://sqlite-utils.datasette.io/en/stable/python-api.html), providing a full API for creating tables, inserting data, and modifying schemas.
