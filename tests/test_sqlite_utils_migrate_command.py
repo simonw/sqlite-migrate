@@ -206,3 +206,101 @@ def foo(db):
         "--stop-before can only be used with a single migrations.py file"
         in result.output
     )
+
+
+def test_dry_run(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    runner = CliRunner()
+
+    # Run with --dry-run flag
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py"), "--dry-run"],
+    )
+    assert result.exit_code == 0
+
+    # Output should indicate it's a dry run
+    assert "Dry run" in result.output or "dry run" in result.output
+
+    # Should show which migrations would be applied
+    assert "foo" in result.output
+    assert "bar" in result.output
+
+    # Should show schema diff
+    assert "Schema" in result.output
+
+    # Database should NOT have the tables (dry run doesn't apply)
+    db = sqlite_utils.Database(db_path)
+    assert not db["foo"].exists()
+    assert not db["bar"].exists()
+
+
+def test_dry_run_no_pending(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    runner = CliRunner()
+
+    # First apply the migrations
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py")],
+    )
+    assert result.exit_code == 0
+
+    # Now run dry-run with no pending migrations
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py"), "--dry-run"],
+    )
+    assert result.exit_code == 0
+    assert (
+        "No pending migrations" in result.output
+        or "no pending" in result.output.lower()
+    )
+
+
+def test_dry_run_with_data(tmpdir):
+    """Test --dry-run-with-data flag copies data for migrations that need it."""
+    path = pathlib.Path(tmpdir)
+    (path / "foo").mkdir()
+    migrations_py = path / "foo" / "migrations.py"
+    migrations_py.write_text(
+        """
+from sqlite_migrate import Migrations
+
+m = Migrations("data_test")
+
+@m()
+def count_items(db):
+    count = list(db.execute("SELECT COUNT(*) FROM items").fetchone())[0]
+    db["stats"].insert({"item_count": count})
+    """,
+        "utf-8",
+    )
+    db_path = str(path / "test.db")
+
+    # Create database with some data
+    db = sqlite_utils.Database(db_path)
+    db["items"].insert_all([{"id": 1, "name": "one"}, {"id": 2, "name": "two"}])
+
+    runner = CliRunner()
+
+    # Run with --dry-run-with-data flag
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(migrations_py), "--dry-run-with-data"],
+    )
+    assert result.exit_code == 0
+
+    # Output should indicate it's a dry run
+    assert "Dry run" in result.output
+
+    # Should show stats table in schema
+    assert "stats" in result.output
+
+    # Database should NOT have the stats table (dry run doesn't apply)
+    db = sqlite_utils.Database(db_path)
+    assert not db["stats"].exists()
+    # Original data should be intact
+    assert db["items"].count == 2

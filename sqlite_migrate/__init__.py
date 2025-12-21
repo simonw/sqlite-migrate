@@ -7,6 +7,16 @@ if TYPE_CHECKING:
     from sqlite_utils.db import Database, Table
 
 
+@dataclass
+class DryRunResult:
+    """Result of a dry-run migration."""
+
+    before_schema: str
+    after_schema: str
+    applied: List[str]
+    rows_affected: Optional[int] = None  # Only set when dry_run_with_data=True
+
+
 class Migrations:
     migrations_table = "_sqlite_migrations"
 
@@ -68,15 +78,94 @@ class Migrations:
             )
         ]
 
-    def apply(self, db: "Database", *, stop_before: Optional[str] = None):
+    def apply(
+        self,
+        db: "Database",
+        *,
+        stop_before: Optional[str] = None,
+        dry_run: bool = False,
+        dry_run_with_data: bool = False,
+    ) -> Optional[DryRunResult]:
         """
         Apply any pending migrations to the database.
+
+        :param db: The sqlite-utils Database instance
+        :param stop_before: Stop before applying this migration
+        :param dry_run: If True, copies only the schema to an in-memory database,
+            runs migrations there, and returns the result without modifying the
+            original database. Use this for fast previews when migrations don't
+            need existing data.
+        :param dry_run_with_data: If True, copies the entire database (schema and
+            data) to an in-memory database using SQLite's backup API, runs
+            migrations there, and returns the result. Use this when migrations
+            need to read or transform existing data. Warning: may use significant
+            memory for large databases.
+        :return: DryRunResult if dry_run or dry_run_with_data is True, otherwise None
         """
         self.ensure_migrations_table(db)
-        for migration in self.pending(db):
+        pending = self.pending(db)
+
+        if dry_run or dry_run_with_data:
+            before_schema = db.schema
+            applied_names: List[str] = []
+
+            if not pending:
+                return DryRunResult(
+                    before_schema=before_schema,
+                    after_schema=before_schema,
+                    applied=[],
+                )
+
+            import sqlite3
+
+            temp_conn = sqlite3.connect(":memory:")
+
+            if dry_run_with_data:
+                # Copy entire database including data using backup API
+                # Warning: may use significant memory for large databases
+                db.conn.backup(temp_conn)
+            else:
+                # Copy only the schema, not the data
+                # This avoids memory issues with large databases
+                if before_schema:
+                    temp_conn.executescript(before_schema)
+
+            # Import Database here to avoid circular import issues
+            from sqlite_utils import Database as SqliteDatabase
+
+            temp_db = SqliteDatabase(temp_conn)
+
+            # Track row changes if using dry_run_with_data
+            rows_before = temp_conn.total_changes if dry_run_with_data else None
+
+            # Run migrations on the temporary copy
+            for migration in pending:
+                name = migration.name
+                if name == stop_before:
+                    break
+                migration.fn(temp_db)
+                applied_names.append(name)
+
+            after_schema = temp_db.schema
+            rows_affected = (
+                temp_conn.total_changes - rows_before
+                if rows_before is not None
+                else None
+            )
+            temp_conn.close()
+
+            return DryRunResult(
+                before_schema=before_schema,
+                after_schema=after_schema,
+                applied=applied_names,
+                rows_affected=rows_affected,
+            )
+
+        # Normal apply
+        for migration in pending:
             name = migration.name
             if name == stop_before:
-                return
+                return None
             migration.fn(db)
             _table(db, self.migrations_table).insert(
                 {
@@ -85,6 +174,7 @@ class Migrations:
                     "applied_at": str(datetime.datetime.now(datetime.timezone.utc)),
                 }
             )
+        return None
 
     def ensure_migrations_table(self, db: "Database"):
         """
