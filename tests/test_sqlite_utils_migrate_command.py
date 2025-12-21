@@ -206,3 +206,52 @@ def foo(db):
         "--stop-before can only be used with a single migrations.py file"
         in result.output
     )
+
+
+def test_dry_run(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    runner = CliRunner()
+
+    # Run with --dry-run flag
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py"), "--dry-run"],
+    )
+    assert result.exit_code == 0
+
+    # Output should indicate it's a dry run
+    assert "Dry run" in result.output or "dry run" in result.output
+
+    # Should show which migrations would be applied
+    assert "foo" in result.output
+    assert "bar" in result.output
+
+    # Should show schema diff
+    assert "Schema" in result.output
+
+    # Database should NOT have the tables (dry run doesn't apply)
+    db = sqlite_utils.Database(db_path)
+    assert not db["foo"].exists()
+    assert not db["bar"].exists()
+
+
+def test_dry_run_no_pending(two_migrations):
+    path, _ = two_migrations
+    db_path = str(path / "test.db")
+    runner = CliRunner()
+
+    # First apply the migrations
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py")],
+    )
+    assert result.exit_code == 0
+
+    # Now run dry-run with no pending migrations
+    result = runner.invoke(
+        sqlite_utils.cli.cli,
+        ["migrate", db_path, str(path / "foo" / "migrations.py"), "--dry-run"],
+    )
+    assert result.exit_code == 0
+    assert "No pending migrations" in result.output or "no pending" in result.output.lower()

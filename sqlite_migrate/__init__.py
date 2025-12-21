@@ -1,10 +1,19 @@
 from dataclasses import dataclass
 import datetime
-from typing import cast, Callable, List, Optional
+from typing import cast, Callable, List, Optional, Union
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sqlite_utils.db import Database, Table
+
+
+@dataclass
+class DryRunResult:
+    """Result of a dry-run migration."""
+
+    before_schema: str
+    after_schema: str
+    applied: List[str]
 
 
 class Migrations:
@@ -68,15 +77,73 @@ class Migrations:
             )
         ]
 
-    def apply(self, db: "Database", *, stop_before: Optional[str] = None):
+    def apply(
+        self,
+        db: "Database",
+        *,
+        stop_before: Optional[str] = None,
+        dry_run: bool = False,
+    ) -> Optional[DryRunResult]:
         """
         Apply any pending migrations to the database.
+
+        :param db: The sqlite-utils Database instance
+        :param stop_before: Stop before applying this migration
+        :param dry_run: If True, run migrations in a transaction then rollback,
+            returning a DryRunResult with schema before/after and list of
+            migrations that would be applied
+        :return: DryRunResult if dry_run=True, otherwise None
         """
         self.ensure_migrations_table(db)
-        for migration in self.pending(db):
+        pending = self.pending(db)
+
+        if dry_run:
+            before_schema = db.schema
+            applied_names: List[str] = []
+
+            if not pending:
+                return DryRunResult(
+                    before_schema=before_schema,
+                    after_schema=before_schema,
+                    applied=[],
+                )
+
+            # Create a temporary in-memory copy of the database to run migrations
+            # This avoids issues with sqlite-utils auto-committing transactions
+            import sqlite3
+
+            temp_conn = sqlite3.connect(":memory:")
+
+            # Copy schema and data from original database
+            db.conn.backup(temp_conn)
+
+            # Import Database here to avoid circular import issues
+            from sqlite_utils import Database as SqliteDatabase
+
+            temp_db = SqliteDatabase(temp_conn)
+
+            # Run migrations on the temporary copy
+            for migration in pending:
+                name = migration.name
+                if name == stop_before:
+                    break
+                migration.fn(temp_db)
+                applied_names.append(name)
+
+            after_schema = temp_db.schema
+            temp_conn.close()
+
+            return DryRunResult(
+                before_schema=before_schema,
+                after_schema=after_schema,
+                applied=applied_names,
+            )
+
+        # Normal apply
+        for migration in pending:
             name = migration.name
             if name == stop_before:
-                return
+                return None
             migration.fn(db)
             _table(db, self.migrations_table).insert(
                 {
@@ -85,6 +152,7 @@ class Migrations:
                     "applied_at": str(datetime.datetime.now(datetime.timezone.utc)),
                 }
             )
+        return None
 
     def ensure_migrations_table(self, db: "Database"):
         """

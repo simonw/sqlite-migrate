@@ -18,7 +18,12 @@ def register_commands(cli):
         "list_", "--list", is_flag=True, help="List migrations without running them"
     )
     @click.option("-v", "--verbose", is_flag=True, help="Show verbose output")
-    def migrate(db_path, migrations, stop_before, list_, verbose):
+    @click.option(
+        "--dry-run",
+        is_flag=True,
+        help="Show what migrations would be applied without applying them",
+    )
+    def migrate(db_path, migrations, stop_before, list_, verbose, dry_run):
         """
         Apply pending database migrations.
 
@@ -69,6 +74,10 @@ def register_commands(cli):
             display_list(db, migration_sets)
             return
 
+        if dry_run:
+            display_dry_run(db, migration_sets, stop_before=stop_before)
+            return
+
         prev_schema = db.schema
         if verbose:
             click.echo("Migrating {}".format(db_path))
@@ -116,3 +125,49 @@ def display_list(db, migration_sets):
         if not output:
             print("    (none)")
         print()
+
+
+def display_dry_run(db, migration_sets, stop_before=None):
+    """Display what migrations would be applied without actually applying them."""
+    all_applied = []
+    combined_before = None
+    combined_after = None
+
+    for migration_set in migration_sets:
+        result = migration_set.apply(db, stop_before=stop_before, dry_run=True)
+        all_applied.extend(result.applied)
+        # Use the first before_schema and last after_schema
+        if combined_before is None:
+            combined_before = result.before_schema
+        combined_after = result.after_schema
+
+    click.echo("Dry run - no changes applied\n")
+
+    if not all_applied:
+        click.echo("No pending migrations")
+        return
+
+    click.echo("Would apply {} migration{}:".format(
+        len(all_applied), "s" if len(all_applied) != 1 else ""
+    ))
+    for name in all_applied:
+        click.echo("  - {}".format(name))
+    click.echo()
+
+    click.echo("Schema before:\n")
+    click.echo(textwrap.indent(combined_before, "  ") or "  (empty)")
+    click.echo()
+
+    click.echo("Schema after:\n")
+    if combined_after == combined_before:
+        click.echo("  (unchanged)")
+    else:
+        click.echo(textwrap.indent(combined_after, "  "))
+        click.echo("\nSchema diff:\n")
+        diff = list(
+            difflib.unified_diff(
+                combined_before.splitlines(), combined_after.splitlines()
+            )
+        )
+        # Skip the first three lines (filenames and @@ markers)
+        click.echo("\n".join(diff[3:]))

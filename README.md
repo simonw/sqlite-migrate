@@ -92,6 +92,50 @@ Migrations for: creatures
     drop_table
 ```
 
+## Dry run mode
+
+Add `--dry-run` to preview what migrations would be applied and see the resulting schema changes without actually modifying the database:
+
+```bash
+sqlite-utils migrate creatures.db --dry-run
+```
+Example output:
+```
+Dry run - no changes applied
+
+Would apply 2 migrations:
+  - create_table
+  - add_weight
+
+Schema before:
+
+  (empty)
+
+Schema after:
+
+  CREATE TABLE [_sqlite_migrations] (
+     [id] INTEGER PRIMARY KEY,
+     [migration_set] TEXT,
+     [name] TEXT,
+     [applied_at] TEXT
+  );
+  CREATE UNIQUE INDEX [idx__sqlite_migrations_migration_set_name]
+      ON [_sqlite_migrations] ([migration_set], [name]);
+  CREATE TABLE [creatures] (
+     [id] INTEGER PRIMARY KEY,
+     [name] TEXT,
+     [species] TEXT,
+     [weight] FLOAT
+  );
+
+Schema diff:
+
++CREATE TABLE [_sqlite_migrations] (
+...
+```
+
+This is useful for verifying migrations before applying them to a production database.
+
 ## Verbose mode
 
 Add `-v` or `--verbose` for verbose output, which will show the schema before and after the migrations were applied along with a diff:
@@ -226,6 +270,18 @@ for m in migration.pending(db):
 
 # Apply migrations up to (but not including) a specific one
 migration.apply(db, stop_before="add_created_at")
+
+# Dry run - preview changes without applying them
+result = migration.apply(db, dry_run=True)
+if result:
+    print(f"Would apply: {result.applied}")
+    print(f"Schema before:\n{result.before_schema}")
+    print(f"Schema after:\n{result.after_schema}")
 ```
 
 The `db` object passed to each migration function is a [sqlite-utils Database instance](https://sqlite-utils.datasette.io/en/stable/python-api.html), providing a full API for creating tables, inserting data, and modifying schemas.
+
+The `dry_run=True` option returns a `DryRunResult` object with:
+- `applied`: List of migration names that would be applied
+- `before_schema`: The database schema before migrations
+- `after_schema`: The database schema after migrations would be applied

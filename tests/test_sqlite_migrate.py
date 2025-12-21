@@ -113,3 +113,56 @@ def test_upgrades_sqlite_migrations(migrations, create_table, pk):
     assert db["_sqlite_migrations"].pks == [pk] if isinstance(pk, str) else pk
     migrations.apply(db)
     assert db["_sqlite_migrations"].pks == ["id"]
+
+
+def test_dry_run(migrations):
+    db = sqlite_utils.Database(memory=True)
+    assert db.table_names() == []
+
+    # Dry run should return result with schema info but not modify database
+    result = migrations.apply(db, dry_run=True)
+
+    # Database should still be empty (except migrations table from ensure_migrations_table)
+    assert "dogs" not in db.table_names()
+    assert "cats" not in db.table_names()
+
+    # Result should contain schema information
+    assert result is not None
+    assert result.before_schema is not None
+    assert result.after_schema is not None
+    assert "dogs" in result.after_schema
+    assert "cats" in result.after_schema
+    assert result.applied == ["m001", "m002"]
+
+    # Now actually apply and verify it works
+    migrations.apply(db)
+    assert set(db.table_names()) == {"_sqlite_migrations", "dogs", "cats"}
+
+
+def test_dry_run_with_stop_before(migrations):
+    db = sqlite_utils.Database(memory=True)
+
+    # Dry run with stop_before
+    result = migrations.apply(db, dry_run=True, stop_before="m002")
+
+    # Should only show m001 as applied
+    assert result.applied == ["m001"]
+    assert "dogs" in result.after_schema
+    assert "cats" not in result.after_schema
+
+    # Database should still be unchanged
+    assert "dogs" not in db.table_names()
+
+
+def test_dry_run_no_pending(migrations):
+    db = sqlite_utils.Database(memory=True)
+
+    # Apply migrations first
+    migrations.apply(db)
+
+    # Dry run with no pending migrations
+    result = migrations.apply(db, dry_run=True)
+
+    assert result is not None
+    assert result.applied == []
+    assert result.before_schema == result.after_schema
