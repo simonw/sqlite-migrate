@@ -134,7 +134,31 @@ Schema diff:
 ...
 ```
 
-This is useful for verifying migrations before applying them to a production database.
+The `--dry-run` option copies only the database schema (not the data) to a temporary in-memory database. This is fast and uses minimal memory, but migrations that need to read or transform existing data won't work correctly.
+
+### Dry run with data
+
+For migrations that need access to existing data (e.g., data transformations, populating new columns based on existing values), use `--dry-run-with-data`:
+
+```bash
+sqlite-utils migrate creatures.db --dry-run-with-data
+```
+
+This copies the entire database (schema and data) to an in-memory database using SQLite's backup API. It also reports how many rows were affected:
+
+```
+Dry run (with data) - no changes applied
+
+Would apply 1 migration:
+  - populate_species_count
+
+Rows affected: 150
+
+Schema before:
+...
+```
+
+**Warning:** `--dry-run-with-data` loads the entire database into memory. For large databases (e.g., 2GB+), this may cause memory issues. Use `--dry-run` for quick schema previews when your migrations don't need existing data.
 
 ## Verbose mode
 
@@ -271,17 +295,26 @@ for m in migration.pending(db):
 # Apply migrations up to (but not including) a specific one
 migration.apply(db, stop_before="add_created_at")
 
-# Dry run - preview changes without applying them
+# Dry run - preview changes without applying them (schema only, fast)
 result = migration.apply(db, dry_run=True)
 if result:
     print(f"Would apply: {result.applied}")
     print(f"Schema before:\n{result.before_schema}")
     print(f"Schema after:\n{result.after_schema}")
+
+# Dry run with data - for migrations that need existing data
+result = migration.apply(db, dry_run_with_data=True)
+if result:
+    print(f"Would apply: {result.applied}")
+    print(f"Rows affected: {result.rows_affected}")
 ```
 
 The `db` object passed to each migration function is a [sqlite-utils Database instance](https://sqlite-utils.datasette.io/en/stable/python-api.html), providing a full API for creating tables, inserting data, and modifying schemas.
 
-The `dry_run=True` option returns a `DryRunResult` object with:
+Both `dry_run=True` and `dry_run_with_data=True` return a `DryRunResult` object with:
 - `applied`: List of migration names that would be applied
 - `before_schema`: The database schema before migrations
 - `after_schema`: The database schema after migrations would be applied
+- `rows_affected`: Number of rows modified (only set when using `dry_run_with_data=True`)
+
+Use `dry_run=True` for fast previews when migrations only modify schema. Use `dry_run_with_data=True` when migrations need to read or transform existing data (note: this copies the entire database into memory).

@@ -14,6 +14,7 @@ class DryRunResult:
     before_schema: str
     after_schema: str
     applied: List[str]
+    rows_affected: Optional[int] = None  # Only set when dry_run_with_data=True
 
 
 class Migrations:
@@ -83,21 +84,28 @@ class Migrations:
         *,
         stop_before: Optional[str] = None,
         dry_run: bool = False,
+        dry_run_with_data: bool = False,
     ) -> Optional[DryRunResult]:
         """
         Apply any pending migrations to the database.
 
         :param db: The sqlite-utils Database instance
         :param stop_before: Stop before applying this migration
-        :param dry_run: If True, run migrations in a transaction then rollback,
-            returning a DryRunResult with schema before/after and list of
-            migrations that would be applied
-        :return: DryRunResult if dry_run=True, otherwise None
+        :param dry_run: If True, copies only the schema to an in-memory database,
+            runs migrations there, and returns the result without modifying the
+            original database. Use this for fast previews when migrations don't
+            need existing data.
+        :param dry_run_with_data: If True, copies the entire database (schema and
+            data) to an in-memory database using SQLite's backup API, runs
+            migrations there, and returns the result. Use this when migrations
+            need to read or transform existing data. Warning: may use significant
+            memory for large databases.
+        :return: DryRunResult if dry_run or dry_run_with_data is True, otherwise None
         """
         self.ensure_migrations_table(db)
         pending = self.pending(db)
 
-        if dry_run:
+        if dry_run or dry_run_with_data:
             before_schema = db.schema
             applied_names: List[str] = []
 
@@ -108,20 +116,27 @@ class Migrations:
                     applied=[],
                 )
 
-            # Create a temporary in-memory database with just the schema (no data)
-            # This avoids memory issues with large databases
             import sqlite3
 
             temp_conn = sqlite3.connect(":memory:")
 
-            # Copy only the schema, not the data
-            if before_schema:
-                temp_conn.executescript(before_schema)
+            if dry_run_with_data:
+                # Copy entire database including data using backup API
+                # Warning: may use significant memory for large databases
+                db.conn.backup(temp_conn)
+            else:
+                # Copy only the schema, not the data
+                # This avoids memory issues with large databases
+                if before_schema:
+                    temp_conn.executescript(before_schema)
 
             # Import Database here to avoid circular import issues
             from sqlite_utils import Database as SqliteDatabase
 
             temp_db = SqliteDatabase(temp_conn)
+
+            # Track row changes if using dry_run_with_data
+            rows_before = temp_conn.total_changes if dry_run_with_data else None
 
             # Run migrations on the temporary copy
             for migration in pending:
@@ -132,12 +147,18 @@ class Migrations:
                 applied_names.append(name)
 
             after_schema = temp_db.schema
+            rows_affected = (
+                temp_conn.total_changes - rows_before
+                if rows_before is not None
+                else None
+            )
             temp_conn.close()
 
             return DryRunResult(
                 before_schema=before_schema,
                 after_schema=after_schema,
                 applied=applied_names,
+                rows_affected=rows_affected,
             )
 
         # Normal apply

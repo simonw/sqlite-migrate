@@ -21,9 +21,14 @@ def register_commands(cli):
     @click.option(
         "--dry-run",
         is_flag=True,
-        help="Show what migrations would be applied without applying them",
+        help="Preview migrations using schema only (fast, low memory)",
     )
-    def migrate(db_path, migrations, stop_before, list_, verbose, dry_run):
+    @click.option(
+        "--dry-run-with-data",
+        is_flag=True,
+        help="Preview migrations with full data copy (for data-dependent migrations)",
+    )
+    def migrate(db_path, migrations, stop_before, list_, verbose, dry_run, dry_run_with_data):
         """
         Apply pending database migrations.
 
@@ -74,8 +79,10 @@ def register_commands(cli):
             display_list(db, migration_sets)
             return
 
-        if dry_run:
-            display_dry_run(db, migration_sets, stop_before=stop_before)
+        if dry_run or dry_run_with_data:
+            display_dry_run(
+                db, migration_sets, stop_before=stop_before, with_data=dry_run_with_data
+            )
             return
 
         prev_schema = db.schema
@@ -127,21 +134,32 @@ def display_list(db, migration_sets):
         print()
 
 
-def display_dry_run(db, migration_sets, stop_before=None):
+def display_dry_run(db, migration_sets, stop_before=None, with_data=False):
     """Display what migrations would be applied without actually applying them."""
     all_applied = []
     combined_before = None
     combined_after = None
+    total_rows_affected = 0
 
     for migration_set in migration_sets:
-        result = migration_set.apply(db, stop_before=stop_before, dry_run=True)
+        if with_data:
+            result = migration_set.apply(
+                db, stop_before=stop_before, dry_run_with_data=True
+            )
+            if result.rows_affected is not None:
+                total_rows_affected += result.rows_affected
+        else:
+            result = migration_set.apply(db, stop_before=stop_before, dry_run=True)
         all_applied.extend(result.applied)
         # Use the first before_schema and last after_schema
         if combined_before is None:
             combined_before = result.before_schema
         combined_after = result.after_schema
 
-    click.echo("Dry run - no changes applied\n")
+    if with_data:
+        click.echo("Dry run (with data) - no changes applied\n")
+    else:
+        click.echo("Dry run - no changes applied\n")
 
     if not all_applied:
         click.echo("No pending migrations")
@@ -155,6 +173,9 @@ def display_dry_run(db, migration_sets, stop_before=None):
     for name in all_applied:
         click.echo("  - {}".format(name))
     click.echo()
+
+    if with_data:
+        click.echo("Rows affected: {}\n".format(total_rows_affected))
 
     click.echo("Schema before:\n")
     click.echo(textwrap.indent(combined_before, "  ") or "  (empty)")

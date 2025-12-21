@@ -166,3 +166,41 @@ def test_dry_run_no_pending(migrations):
     assert result is not None
     assert result.applied == []
     assert result.before_schema == result.after_schema
+
+
+def test_dry_run_with_data():
+    """Test dry_run_with_data copies data for migrations that need it."""
+    migrations = Migrations("data_test")
+
+    @migrations()
+    def create_table(db):
+        db["items"].create({"id": int, "name": str}, pk="id")
+
+    @migrations()
+    def count_items(db):
+        # This migration needs data to work correctly
+        count = list(db.execute("SELECT COUNT(*) FROM items").fetchone())[0]
+        db["stats"].insert({"item_count": count})
+
+    db = sqlite_utils.Database(memory=True)
+
+    # Create table and insert some data
+    db["items"].create({"id": int, "name": str}, pk="id")
+    db["items"].insert_all([{"id": 1, "name": "one"}, {"id": 2, "name": "two"}])
+
+    # Mark first migration as already applied
+    migrations.ensure_migrations_table(db)
+    db["_sqlite_migrations"].insert(
+        {"migration_set": "data_test", "name": "create_table", "applied_at": "2024-01-01"}
+    )
+
+    # dry_run_with_data should copy the data
+    result = migrations.apply(db, dry_run_with_data=True)
+
+    assert result is not None
+    assert result.applied == ["count_items"]
+    assert "stats" in result.after_schema
+
+    # Original database should be unchanged
+    assert "stats" not in db.table_names()
+    assert list(db["items"].rows) == [{"id": 1, "name": "one"}, {"id": 2, "name": "two"}]
