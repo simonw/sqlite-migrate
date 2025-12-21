@@ -108,14 +108,15 @@ class Migrations:
                     applied=[],
                 )
 
-            # Create a temporary in-memory copy of the database to run migrations
-            # This avoids issues with sqlite-utils auto-committing transactions
+            # Create a temporary in-memory database with just the schema (no data)
+            # This avoids memory issues with large databases
             import sqlite3
 
             temp_conn = sqlite3.connect(":memory:")
 
-            # Copy schema and data from original database
-            db.conn.backup(temp_conn)
+            # Copy only the schema, not the data
+            if before_schema:
+                temp_conn.executescript(before_schema)
 
             # Import Database here to avoid circular import issues
             from sqlite_utils import Database as SqliteDatabase
