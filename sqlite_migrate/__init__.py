@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import datetime
-from typing import cast, Callable, List, Optional, Union
+from typing import cast, Callable, List, Optional
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
