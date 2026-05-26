@@ -3,28 +3,28 @@
 
 # Install dependencies and test dependencies
 @init:
-  pipenv run pip install -e '.[test]'
+  uv sync
 
 # Run pytest with supplied options
 @test *options:
-  pipenv run pytest {{options}}
+  uv run pytest {{options}}
 
 # Run linters
 @lint:
   echo "Linters..."
   echo "  Black"
-  pipenv run black . --check
+  uv run black . --check
   echo "  mypy"
-  pipenv run mypy sqlite_migrate tests
+  uv run mypy sqlite_migrate tests
   echo "  ruff"
-  pipenv run ruff .
+  uv run ruff check .
 
 
 # Apply Black
 @black:
-  pipenv run black .
+  uv run black .
 
 # Run automatic fixes
 @fix:
-  pipenv run ruff . --fix
-  pipenv run black .
+  uv run ruff check . --fix
+  uv run black .
