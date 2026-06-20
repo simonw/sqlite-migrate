@@ -2,6 +2,8 @@ import sqlite_utils.cli
 import pathlib
 from click.testing import CliRunner
 import pytest
+from sqlite_migrate import Migrations
+from sqlite_migrate.sqlite_utils_plugin import display_list
 
 TWO_MIGRATIONS = """
 from sqlite_migrate import Migrations
@@ -70,6 +72,30 @@ def test_basic(two_migrations, arg):
     assert len(rows) == 2
     assert rows[0]["name"] == "foo"
     assert rows[1]["name"] == "bar"
+
+
+def test_list_same_migration_names_in_different_sets(capsys):
+    applied = Migrations("applied")
+
+    @applied()
+    def foo(db):
+        db["applied"].insert({"hello": "world"})
+
+    pending = Migrations("pending")
+
+    @pending()
+    def foo(db):
+        db["pending"].insert({"hello": "world"})
+
+    db = sqlite_utils.Database(memory=True)
+    applied.apply(db)
+
+    display_list(db, [applied, pending])
+
+    output = capsys.readouterr().out
+    assert (
+        "Migrations for: pending\n\n" "  Applied:\n\n" "  Pending:\n" "    foo\n\n"
+    ) in output
 
 
 def test_verbose(tmpdir):

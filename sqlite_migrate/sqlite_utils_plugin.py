@@ -98,21 +98,18 @@ def register_commands(cli):
 
 
 def display_list(db, migration_sets):
-    applied = set()
     for migration_set in migration_sets:
         print("Migrations for: {}".format(migration_set.name))
         print()
         print("  Applied:")
         for migration in migration_set.applied(db):
             print("    {} - {}".format(migration.name, migration.applied_at))
-            applied.add(migration.name)
         print()
         print("  Pending:")
         output = False
         for migration in migration_set.pending(db):
             output = True
-            if migration.name not in applied:
-                print("    {}".format(migration.name))
+            print("    {}".format(migration.name))
         if not output:
             print("    (none)")
         print()
