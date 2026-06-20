@@ -11,7 +11,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "sqlite-utils"
+    "sqlite-utils<4"
 ]
 
 [project.urls]
