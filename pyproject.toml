@@ -1,6 +1,6 @@
 [project]
 name = "sqlite-migrate"
-version = "0.1b0"
+version = "0.1b1"
 description = "A simple database migration system for SQLite, based on sqlite-utils"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
@@ -10,7 +10,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "sqlite-utils"
+    "sqlite-utils<4"
 ]
 
 [project.urls]
