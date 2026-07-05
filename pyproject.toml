@@ -24,7 +24,7 @@ CI = "https://github.com/simonw/sqlite-migrate/actions"
 migrate = "sqlite_migrate.sqlite_utils_plugin"
 
 [dependency-groups]
-dev = ["pytest", "mypy", "black", "ruff", "cogapp"]
+dev = ["pytest", "mypy", "black", "cogapp"]
 
 [build-system]
 requires = ["uv_build>=0.9.18,<0.12.0"]

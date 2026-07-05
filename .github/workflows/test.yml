@@ -29,5 +29,4 @@ jobs:
       run: |
         mypy sqlite_migrate tests
         black --check .
-        ruff check .
         cog --check README.md

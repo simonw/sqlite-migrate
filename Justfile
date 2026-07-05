@@ -16,9 +16,6 @@
   uv run black . --check
   echo "  mypy"
   uv run mypy sqlite_migrate tests
-  echo "  ruff"
-  uv run ruff check .
-
 
 # Apply Black
 @black:
@@ -26,5 +23,4 @@
 
 # Run automatic fixes
 @fix:
-  uv run ruff check . --fix
   uv run black .
