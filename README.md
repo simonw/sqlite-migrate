@@ -31,4 +31,4 @@ Run migrations using the `sqlite-utils migrate` command:
 sqlite-utils migrate creatures.db path/to/migrations.py
 ```
 
-See the `sqlite-utils` migrations documentation for the full Python API and CLI usage.
+See the [`sqlite-utils` migrations documentation](https://sqlite-utils.datasette.io/en/stable/migrations.html) for the full Python API and CLI usage.
