@@ -1,6 +1,6 @@
 [project]
 name = "sqlite-migrate"
-version = "0.1b0"
+version = "0.2"
 description = "Compatibility package for sqlite-utils migrations"
 readme = "README.md"
 requires-python = ">=3.10"
