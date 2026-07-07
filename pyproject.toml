@@ -1,17 +1,17 @@
 [project]
 name = "sqlite-migrate"
 version = "0.1b0"
-description = "A simple database migration system for SQLite, based on sqlite-utils"
+description = "Compatibility package for sqlite-utils migrations"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Simon Willison"}]
 license = "Apache-2.0"
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha"
+    "Development Status :: 7 - Inactive"
 ]
 
 dependencies = [
-    "sqlite-utils!=4.0,<4.0.post0"
+    "sqlite-utils>=4"
 ]
 
 [project.urls]
@@ -19,9 +19,6 @@ Homepage = "https://github.com/simonw/sqlite-migrate"
 Changelog = "https://github.com/simonw/sqlite-migrate/releases"
 Issues = "https://github.com/simonw/sqlite-migrate/issues"
 CI = "https://github.com/simonw/sqlite-migrate/actions"
-
-[project.entry-points.sqlite_utils]
-migrate = "sqlite_migrate.sqlite_utils_plugin"
 
 [dependency-groups]
 dev = ["pytest", "mypy", "black", "cogapp"]
