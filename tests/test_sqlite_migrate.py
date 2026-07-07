@@ -3,6 +3,10 @@ import sqlite_utils
 import pytest
 
 
+def test_reexports_sqlite_utils_migrations():
+    assert Migrations is sqlite_utils.Migrations
+
+
 @pytest.fixture
 def migrations():
     migrations = Migrations("test")
@@ -14,7 +18,7 @@ def migrations():
     @migrations()
     def m002(db):
         db["cats"].create({"name": str})
-        db.query("insert into dogs (name) values ('Pancakes')")
+        db.execute("insert into dogs (name) values ('Pancakes')")
 
     return migrations
 
@@ -32,7 +36,7 @@ def migrations_not_ordered_alphabetically():
     @migrations()
     def m001(db):
         db["cats"].create({"name": str})
-        db.query("insert into dogs (name) values ('Pancakes')")
+        db.execute("insert into dogs (name) values ('Pancakes')")
 
     return migrations
 
